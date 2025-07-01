@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Six Sigma Shooting Game</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" />
+  <style>
+    :root {
+      --bg1: #1f1c2c;
+      --bg2: #928dab;
+      --accent: #ff6b6b;
+      --card: rgba(255,255,255,0.1);
+      --text: #fff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family:'Poppins',sans-serif;
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      overflow:hidden; display:flex;
+      align-items:center; justify-content:center;
+      height:100vh;
+    }
+    .container {
+      width:90%; max-width:900px;
+      background:var(--card); border-radius:16px;
+      padding:20px; backdrop-filter:blur(10px);
+      box-shadow:0 8px 32px rgba(0,0,0,0.3);
+      text-align:center;
+    }
+    h1 {
+      font-size:2rem; margin-bottom:10px;
+      font-weight:600;
+    }
+    h1 .fa-bullseye {
+      color:var(--accent); margin-left:8px;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    #menu { margin-bottom:20px; }
+    #menu input,#menu button {
+      padding:10px; border:none;
+      border-radius:8px; font-size:1rem;
+    }
+    #menu input { width:80px; text-align:center; margin-right:10px; }
+    #menu button {
+      background:var(--accent); color:#fff;
+      cursor:pointer; transition:background 0.3s;
+    }
+    #menu button:hover { background:#ff5252; }
+    #scoreBoard {
+      display:flex; justify-content:space-around;
+      margin-bottom:15px; font-size:1.2rem;
+    }
+    canvas {
+      width:100%; border:4px solid var(--accent);
+      border-radius:12px; background:rgba(255,255,255,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Six Sigma Shooting Game <i class="fas fa-bullseye"></i></h1>
+    <div id="menu">
+      <input id="targetCount" type="number" min="1" max="20" value="3" />
+      <button id="startBtn">Start</button>
+    </div>
+    <div id="scoreBoard">
+      <div>Score: <span id="score">0</span></div>
+      <div>Shots: <span id="shots">0</span> / <span id="maxShots">10</span></div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+  </div>
+
+  <!-- Preloaded Audio -->
+  <audio id="bgMusic" src="bg-music.mp3" loop></audio>
+  <audio id="hitSnd" src="gunshot.mp3"></audio>
+  <audio id="missSnd" src="missshot.mp3"></audio>
+  <audio id="shotSnd" src="gunshot.mp3"></audio>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const shotsEl = document.getElementById('shots');
+    const maxShotsEl = document.getElementById('maxShots');
+    const startBtn = document.getElementById('startBtn');
+    const targetInput = document.getElementById('targetCount');
+
+    const bgMusic = document.getElementById('bgMusic');
+    const hitSnd = document.getElementById('hitSnd');
+    const missSnd = document.getElementById('missSnd');
+    const shotSnd = document.getElementById('shotSnd');
+
+    let targets = [], score=0, shots=0, maxShots=10;
+
+    function createTarget(){
+      return { x: Math.random()*(canvas.width-40)+20,
+               y: Math.random()*(canvas.height-40)+20,
+               size: 20,
+               dx: (Math.random()-0.5)*6,
+               dy: (Math.random()-0.5)*6 };
+    }
+    function update(){
+      targets.forEach(t=>{
+        t.x += t.dx; t.y += t.dy;
+        if(t.x < t.size || t.x > canvas.width - t.size) t.dx *= -1;
+        if(t.y < t.size || t.y > canvas.height - t.size) t.dy *= -1;
+      });
+    }
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      targets.forEach(t=>{
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.size, 0, 2*Math.PI);
+        ctx.fillStyle = '#e74c3c'; ctx.fill();
+        ctx.lineWidth = 3; ctx.strokeStyle = '#c0392b'; ctx.stroke();
+      });
+    }
+    function loop(){ update(); draw(); requestAnimationFrame(loop); }
+    function updateScore(){
+      scoreEl.textContent = score;
+      shotsEl.textContent = shots;
+      maxShotsEl.textContent = maxShots;
+    }
+
+    canvas.addEventListener('click', e => {
+      if(shots >= maxShots) return;
+      shotSnd.currentTime = 0; shotSnd.play();
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+
+      let hit = false;
+      targets.forEach((t, i) => {
+        if(!hit && Math.hypot(mx-t.x, my-t.y) <= t.size){
+          hit = true;
+          score++;
+          hitSnd.currentTime = 0; hitSnd.play();
+          targets.splice(i,1);
+        }
+      });
+      if(!hit) { missSnd.currentTime = 0; missSnd.play(); }
+      shots++;
+      updateScore();
+    });
+
+    startBtn.onclick = () => {
+      const n = Math.min(Math.max(parseInt(targetInput.value) || 3, 1), 20);
+      targets = [];
+      for(let i=0; i<n; i++) targets.push(createTarget());
+      score = shots = 0;
+      updateScore();
+      bgMusic.currentTime = 0; bgMusic.play().catch(() => {});
+      loop();
+    };
+  </script>
+</body>
+</html>
